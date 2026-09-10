@@ -115,6 +115,7 @@ def import_students_csv(course_id: int, file: UploadFile, db: Session = Depends(
     errors: list[ImportRowError] = []
 
     for i, row in enumerate(reader, start=2):
+        sp = db.begin_nested()
         student = Student(
             course_id=course_id,
             name=row["name"].strip(),
@@ -124,13 +125,11 @@ def import_students_csv(course_id: int, file: UploadFile, db: Session = Depends(
         )
         db.add(student)
         try:
-            db.flush()
+            sp.commit()
             imported += 1
         except IntegrityError:
-            db.rollback()
+            sp.rollback()
             errors.append(ImportRowError(row=i, error=f"Duplicate student_id: {row['student_id'].strip()}"))
-            db.add(student)
-            db.rollback()
 
     db.commit()
     return ImportResult(imported=imported, errors=errors)

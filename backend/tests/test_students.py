@@ -205,6 +205,9 @@ def test_import_csv_row_level_errors(client):
     assert data["imported"] == 1
     assert len(data["errors"]) == 1
     assert data["errors"][0]["row"] == 2
+    students = client.get(f"/api/courses/{cid}/students").json()
+    assert len(students) == 2
+    assert {s["student_id"] for s in students} == {"A001", "A002"}
 
 
 def test_import_csv_course_not_found(client):
