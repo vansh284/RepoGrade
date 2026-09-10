@@ -1,7 +1,16 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, String, UniqueConstraint
+import enum
+
+from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+class CloneStatus(enum.Enum):
+    pending = "pending"
+    cloned = "cloned"
+    missing = "missing"
+    error = "error"
 
 
 class Course(Base):
@@ -26,6 +35,7 @@ class Student(Base):
     github_username = Column(String, nullable=False)
 
     course = relationship("Course", back_populates="students")
+    submissions = relationship("Submission", back_populates="student", cascade="all, delete-orphan")
 
 
 class Assignment(Base):
@@ -42,6 +52,7 @@ class Assignment(Base):
     course = relationship("Course", back_populates="assignments")
     grading_components = relationship("GradingComponent", back_populates="assignment", cascade="all, delete-orphan")
     environment_variables = relationship("EnvironmentVariable", back_populates="assignment", cascade="all, delete-orphan")
+    submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")
 
 
 class GradingComponent(Base):
@@ -65,3 +76,20 @@ class EnvironmentVariable(Base):
     value = Column(String, nullable=False)
 
     assignment = relationship("Assignment", back_populates="environment_variables")
+
+
+class Submission(Base):
+    __tablename__ = "submissions"
+    __table_args__ = (
+        UniqueConstraint("student_id", "assignment_id", name="uq_student_assignment"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    assignment_id = Column(Integer, ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
+    repo_url = Column(String, nullable=False)
+    clone_status = Column(Enum(CloneStatus), nullable=False, default=CloneStatus.pending)
+    clone_path = Column(String, nullable=True)
+
+    student = relationship("Student", back_populates="submissions")
+    assignment = relationship("Assignment", back_populates="submissions")

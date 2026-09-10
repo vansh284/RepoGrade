@@ -9,6 +9,7 @@ from app.database import Base, engine
 from app.routes.assignments import router as assignments_router
 from app.routes.courses import router as courses_router
 from app.routes.students import router as students_router
+from app.routes.submissions import router as submissions_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -24,3 +25,4 @@ app.add_middleware(
 app.include_router(courses_router)
 app.include_router(students_router)
 app.include_router(assignments_router)
+app.include_router(submissions_router)

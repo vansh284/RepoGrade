@@ -323,7 +323,10 @@ export default function AssignmentsPage() {
                     {a.grading_components.length}
                   </td>
                   <td style={{ padding: 8, borderBottom: "1px solid #eee", textAlign: "right" }}>
-                    <button onClick={() => startEdit(a)}>Edit</button>
+                    <Link to={`/courses/${cid}/assignments/${a.id}/dashboard`}>
+                      <button type="button">Dashboard</button>
+                    </Link>
+                    <button onClick={() => startEdit(a)} style={{ marginLeft: 4 }}>Edit</button>
                     <button onClick={() => handleDelete(a.id)} style={{ marginLeft: 4 }}>
                       Delete
                     </button>

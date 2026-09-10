@@ -119,3 +119,33 @@ class ImportRowError(BaseModel):
 class ImportResult(BaseModel):
     imported: int
     errors: list[ImportRowError]
+
+
+# ── Submission ─────────────────────────────────────────────────
+
+
+class SubmissionOut(BaseModel):
+    id: int
+    student_id: int
+    assignment_id: int
+    repo_url: str
+    clone_status: str
+    clone_path: str | None
+
+    model_config = {"from_attributes": True, "use_enum_values": True}
+
+
+class DashboardRow(BaseModel):
+    student_name: str
+    github_username: str
+    student_db_id: int
+    clone_status: str
+    repo_url: str
+
+    model_config = {"from_attributes": True}
+
+
+class CloneProgress(BaseModel):
+    total: int
+    completed: int
+    failed: int

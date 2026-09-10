@@ -82,6 +82,20 @@ export interface AssignmentInput {
   environment_variables: EnvVarInput[];
 }
 
+export interface DashboardRow {
+  student_name: string;
+  github_username: string;
+  student_db_id: number;
+  clone_status: string;
+  repo_url: string;
+}
+
+export interface CloneProgress {
+  total: number;
+  completed: number;
+  failed: number;
+}
+
 export const api = {
   courses: {
     list: () => request<Course[]>("/courses"),
@@ -149,5 +163,31 @@ export const api = {
       }),
     delete: (courseId: number, id: number) =>
       request<void>(`/courses/${courseId}/assignments/${id}`, { method: "DELETE" }),
+  },
+  submissions: {
+    clone: (courseId: number, assignmentId: number) =>
+      request<CloneProgress>(
+        `/courses/${courseId}/assignments/${assignmentId}/clone`,
+        { method: "POST" },
+      ),
+    dashboard: (
+      courseId: number,
+      assignmentId: number,
+      params?: { status?: string; search?: string; sort?: string; order?: string },
+    ) => {
+      const q = new URLSearchParams();
+      if (params?.status) q.set("status", params.status);
+      if (params?.search) q.set("search", params.search);
+      if (params?.sort) q.set("sort", params.sort);
+      if (params?.order) q.set("order", params.order);
+      const qs = q.toString();
+      return request<DashboardRow[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/dashboard${qs ? `?${qs}` : ""}`,
+      );
+    },
+    progress: (courseId: number, assignmentId: number) =>
+      request<CloneProgress>(
+        `/courses/${courseId}/assignments/${assignmentId}/clone/progress`,
+      ),
   },
 };
