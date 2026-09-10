@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Assignment, Course, EnvironmentVariable, GradingComponent
@@ -63,7 +63,12 @@ def create_assignment(course_id: int, data: AssignmentCreate, db: Session = Depe
 @router.get("/api/courses/{course_id}/assignments", response_model=list[AssignmentOut])
 def list_assignments(course_id: int, db: Session = Depends(get_db)):
     _get_course(db, course_id)
-    return db.query(Assignment).filter(Assignment.course_id == course_id).all()
+    return (
+        db.query(Assignment)
+        .filter(Assignment.course_id == course_id)
+        .options(selectinload(Assignment.grading_components), selectinload(Assignment.environment_variables))
+        .all()
+    )
 
 
 @router.get("/api/courses/{course_id}/assignments/{assignment_id}", response_model=AssignmentOut)

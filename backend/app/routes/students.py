@@ -104,7 +104,11 @@ def delete_student(course_id: int, student_id: int, db: Session = Depends(get_db
 @router.post("/import", response_model=ImportResult)
 def import_students_csv(course_id: int, file: UploadFile, db: Session = Depends(get_db)):
     _get_course(course_id, db)
-    content = file.file.read().decode("utf-8")
+    raw = file.file.read()
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not valid UTF-8")
     reader = csv.DictReader(io.StringIO(content))
 
     if not reader.fieldnames or not REQUIRED_COLUMNS.issubset(set(reader.fieldnames)):
@@ -115,21 +119,23 @@ def import_students_csv(course_id: int, file: UploadFile, db: Session = Depends(
     errors: list[ImportRowError] = []
 
     for i, row in enumerate(reader, start=2):
+        try:
+            values = {col: (row[col] or "").strip() for col in REQUIRED_COLUMNS}
+        except (KeyError, TypeError):
+            errors.append(ImportRowError(row=i, error="Malformed row"))
+            continue
+        if not all(values.values()):
+            errors.append(ImportRowError(row=i, error="Missing required field(s)"))
+            continue
         sp = db.begin_nested()
-        student = Student(
-            course_id=course_id,
-            name=row["name"].strip(),
-            student_id=row["student_id"].strip(),
-            email=row["email"].strip(),
-            github_username=row["github_username"].strip(),
-        )
+        student = Student(course_id=course_id, **values)
         db.add(student)
         try:
             sp.commit()
             imported += 1
         except IntegrityError:
             sp.rollback()
-            errors.append(ImportRowError(row=i, error=f"Duplicate student_id: {row['student_id'].strip()}"))
+            errors.append(ImportRowError(row=i, error=f"Duplicate student_id: {values['student_id']}"))
 
     db.commit()
     return ImportResult(imported=imported, errors=errors)

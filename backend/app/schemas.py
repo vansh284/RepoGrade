@@ -8,8 +8,7 @@ class CourseCreate(BaseModel):
     name: str
 
 
-class CourseUpdate(BaseModel):
-    name: str
+CourseUpdate = CourseCreate
 
 
 class CourseOut(BaseModel):
@@ -28,10 +27,7 @@ class GradingComponentCreate(BaseModel):
     weight: float
 
 
-class GradingComponentUpdate(BaseModel):
-    name: str
-    max_points: int
-    weight: float
+GradingComponentUpdate = GradingComponentCreate
 
 
 class GradingComponentOut(BaseModel):
@@ -51,9 +47,7 @@ class EnvVarCreate(BaseModel):
     value: str
 
 
-class EnvVarUpdate(BaseModel):
-    key: str
-    value: str
+EnvVarUpdate = EnvVarCreate
 
 
 class EnvVarOut(BaseModel):
@@ -77,14 +71,7 @@ class AssignmentCreate(BaseModel):
     environment_variables: list[EnvVarCreate] = []
 
 
-class AssignmentUpdate(BaseModel):
-    name: str
-    github_repo_name: str
-    checks_directory: str
-    evaluator_weight: float
-    peer_weight: float
-    grading_components: list[GradingComponentCreate] = []
-    environment_variables: list[EnvVarCreate] = []
+AssignmentUpdate = AssignmentCreate
 
 
 class AssignmentOut(BaseModel):
@@ -100,6 +87,9 @@ class AssignmentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Student ─────────────────────────────────────────────────────
+
+
 class StudentCreate(BaseModel):
     name: str
     student_id: str
@@ -107,11 +97,7 @@ class StudentCreate(BaseModel):
     github_username: str
 
 
-class StudentUpdate(BaseModel):
-    name: str
-    student_id: str
-    email: str
-    github_username: str
+StudentUpdate = StudentCreate
 
 
 class StudentOut(BaseModel):
