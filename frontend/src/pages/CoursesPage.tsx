@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, Course } from "../api/client";
+import { Link } from "react-router-dom";
+import { api } from "../api/client";
+import type { Course } from "../api/client";
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -108,11 +110,18 @@ export default function CoursesPage() {
                     </>
                   ) : (
                     <>
+                      <Link to={`/courses/${c.id}/assignments`}>
+                        <button type="button">Assignments</button>
+                      </Link>
+                      <Link to={`/courses/${c.id}/students`} style={{ marginLeft: 4 }}>
+                        <button type="button">Students</button>
+                      </Link>
                       <button
                         onClick={() => {
                           setEditingId(c.id);
                           setEditName(c.name);
                         }}
+                        style={{ marginLeft: 4 }}
                       >
                         Edit
                       </button>
