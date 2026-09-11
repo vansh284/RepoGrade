@@ -110,6 +110,31 @@ export interface CheckProgress {
   completed: number;
 }
 
+export interface EmailTemplate {
+  id: number;
+  assignment_id: number;
+  name: string;
+  subject_template: string;
+  body_template: string;
+}
+
+export interface EmailTemplateInput {
+  name: string;
+  subject_template: string;
+  body_template: string;
+}
+
+export interface EmailPreview {
+  subject: string;
+  body: string;
+}
+
+export interface BatchSendResult {
+  sent: number;
+  failed: number;
+  errors: string[];
+}
+
 export const api = {
   courses: {
     list: () => request<Course[]>("/courses"),
@@ -216,5 +241,35 @@ export const api = {
       ),
     exportUrl: (courseId: number, assignmentId: number) =>
       `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/check-results/export`,
+  },
+  emailTemplates: {
+    list: (courseId: number, assignmentId: number) =>
+      request<EmailTemplate[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates`,
+      ),
+    create: (courseId: number, assignmentId: number, data: EmailTemplateInput) =>
+      request<EmailTemplate>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates`,
+        { method: "POST", body: JSON.stringify(data) },
+      ),
+    update: (courseId: number, assignmentId: number, id: number, data: EmailTemplateInput) =>
+      request<EmailTemplate>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates/${id}`,
+        { method: "PUT", body: JSON.stringify(data) },
+      ),
+    delete: (courseId: number, assignmentId: number, id: number) =>
+      request<void>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates/${id}`,
+        { method: "DELETE" },
+      ),
+    preview: (courseId: number, assignmentId: number, templateId: number, studentId: number) =>
+      request<EmailPreview>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates/${templateId}/preview?student_id=${studentId}`,
+      ),
+    send: (courseId: number, assignmentId: number, templateId: number, checkName: string) =>
+      request<BatchSendResult>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates/${templateId}/send?check_name=${encodeURIComponent(checkName)}`,
+        { method: "POST" },
+      ),
   },
 };
