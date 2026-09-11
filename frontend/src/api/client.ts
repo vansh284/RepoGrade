@@ -82,18 +82,32 @@ export interface AssignmentInput {
   environment_variables: EnvVarInput[];
 }
 
+export interface DashboardCheckResult {
+  check_name: string;
+  passed: boolean;
+  message: string;
+  details: string;
+  stderr: string;
+}
+
 export interface DashboardRow {
   student_name: string;
   github_username: string;
   student_db_id: number;
   clone_status: string;
   repo_url: string;
+  check_results: DashboardCheckResult[];
 }
 
 export interface CloneProgress {
   total: number;
   completed: number;
   failed: number;
+}
+
+export interface CheckProgress {
+  total: number;
+  completed: number;
 }
 
 export const api = {
@@ -189,5 +203,18 @@ export const api = {
       request<CloneProgress>(
         `/courses/${courseId}/assignments/${assignmentId}/clone/progress`,
       ),
+  },
+  checks: {
+    run: (courseId: number, assignmentId: number) =>
+      request<CheckProgress>(
+        `/courses/${courseId}/assignments/${assignmentId}/run-checks`,
+        { method: "POST" },
+      ),
+    progress: (courseId: number, assignmentId: number) =>
+      request<CheckProgress>(
+        `/courses/${courseId}/assignments/${assignmentId}/check-results/progress`,
+      ),
+    exportUrl: (courseId: number, assignmentId: number) =>
+      `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/check-results/export`,
   },
 };

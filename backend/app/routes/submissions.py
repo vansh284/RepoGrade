@@ -9,30 +9,13 @@ from sqlalchemy.orm import Session
 
 from app import git_service
 from app.database import get_db
-from app.models import Assignment, CloneStatus, Course, Student, Submission
-from app.schemas import CloneProgress, DashboardRow, SubmissionOut
+from app.models import CheckResult, CloneStatus, Student, Submission
+from app.routes.helpers import _get_assignment, _get_course
+from app.schemas import CloneProgress, DashboardCheckResult, DashboardRowWithChecks, SubmissionOut
 
 router = APIRouter(tags=["submissions"])
 
 REPO_BASE_PATH = os.environ.get("REPO_BASE_PATH", "./repos")
-
-
-def _get_course(db: Session, course_id: int) -> Course:
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-def _get_assignment(db: Session, course_id: int, assignment_id: int) -> Assignment:
-    assignment = (
-        db.query(Assignment)
-        .filter(Assignment.id == assignment_id, Assignment.course_id == course_id)
-        .first()
-    )
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    return assignment
 
 
 def _safe_path_segment(value: str) -> str:
@@ -129,7 +112,7 @@ def clone_repos(
 
 @router.get(
     "/api/courses/{course_id}/assignments/{assignment_id}/dashboard",
-    response_model=list[DashboardRow],
+    response_model=list[DashboardRowWithChecks],
 )
 def assignment_dashboard(
     course_id: int,
@@ -152,17 +135,40 @@ def assignment_dashboard(
     ):
         submissions_map[sub.student_id] = sub
 
-    rows: list[DashboardRow] = []
+    submission_ids = [s.id for s in submissions_map.values()]
+    check_results_map: dict[int, list[CheckResult]] = {}
+    if submission_ids:
+        for cr in (
+            db.query(CheckResult)
+            .filter(CheckResult.submission_id.in_(submission_ids))
+            .all()
+        ):
+            check_results_map.setdefault(cr.submission_id, []).append(cr)
+
+    rows: list[DashboardRowWithChecks] = []
     for student in students:
         sub = submissions_map.get(student.id)
         repo_url = f"https://github.com/{student.github_username}/{assignment.github_repo_name}"
+        checks: list[DashboardCheckResult] = []
+        if sub:
+            for cr in check_results_map.get(sub.id, []):
+                checks.append(
+                    DashboardCheckResult(
+                        check_name=cr.check_name,
+                        passed=cr.passed,
+                        message=cr.message,
+                        details=cr.details,
+                        stderr=cr.stderr,
+                    )
+                )
         rows.append(
-            DashboardRow(
+            DashboardRowWithChecks(
                 student_name=student.name,
                 github_username=student.github_username,
                 student_db_id=student.id,
                 clone_status=sub.clone_status.value if sub else "pending",
                 repo_url=sub.repo_url if sub else repo_url,
+                check_results=checks,
             )
         )
 

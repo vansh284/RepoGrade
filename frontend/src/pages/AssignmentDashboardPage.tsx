@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { DashboardRow, CloneProgress } from "../api/client";
+import type { DashboardRow, CloneProgress, CheckProgress } from "../api/client";
 
 type SortField = "student_name" | "github_username" | "clone_status";
 
@@ -16,12 +16,15 @@ export default function AssignmentDashboardPage() {
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [error, setError] = useState("");
   const [cloning, setCloning] = useState(false);
-  const [progress, setProgress] = useState<CloneProgress | null>(null);
+  const [cloneProgress, setCloneProgress] = useState<CloneProgress | null>(null);
+  const [runningChecks, setRunningChecks] = useState(false);
+  const [checkProgress, setCheckProgress] = useState<CheckProgress | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("student_name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [assignmentName, setAssignmentName] = useState("");
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   const load = () => {
     api.submissions
@@ -45,15 +48,29 @@ export default function AssignmentDashboardPage() {
 
   const handleClone = async () => {
     setCloning(true);
-    setProgress(null);
+    setCloneProgress(null);
     try {
       const result = await api.submissions.clone(cid, aid);
-      setProgress(result);
+      setCloneProgress(result);
       load();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setCloning(false);
+    }
+  };
+
+  const handleRunChecks = async () => {
+    setRunningChecks(true);
+    setCheckProgress(null);
+    try {
+      const result = await api.checks.run(cid, aid);
+      setCheckProgress(result);
+      load();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setRunningChecks(false);
     }
   };
 
@@ -89,6 +106,14 @@ export default function AssignmentDashboardPage() {
     }
   };
 
+  const checkNames = new Set<string>();
+  for (const row of rows) {
+    for (const cr of row.check_results) {
+      checkNames.add(cr.check_name);
+    }
+  }
+  const sortedCheckNames = Array.from(checkNames).sort();
+
   return (
     <div>
       <Link
@@ -123,14 +148,28 @@ export default function AssignmentDashboardPage() {
           {cloning ? "Cloning..." : "Clone All Repos"}
         </button>
 
-        {progress && (
+        <button onClick={handleRunChecks} disabled={runningChecks}>
+          {runningChecks ? "Running Checks..." : "Run Checks"}
+        </button>
+
+        <a href={api.checks.exportUrl(cid, aid)} download>
+          <button type="button">Export CSV</button>
+        </a>
+
+        {cloneProgress && (
           <span style={{ fontSize: 13 }}>
-            {progress.completed}/{progress.total} cloned
-            {progress.failed > 0 && (
+            {cloneProgress.completed}/{cloneProgress.total} cloned
+            {cloneProgress.failed > 0 && (
               <span style={{ color: "#c62828" }}>
-                , {progress.failed} failed
+                , {cloneProgress.failed} failed
               </span>
             )}
+          </span>
+        )}
+
+        {checkProgress && (
+          <span style={{ fontSize: 13 }}>
+            Checks: {checkProgress.completed}/{checkProgress.total} completed
           </span>
         )}
       </div>
@@ -144,10 +183,7 @@ export default function AssignmentDashboardPage() {
           flexWrap: "wrap",
         }}
       >
-        <form
-          onSubmit={handleSearch}
-          style={{ display: "flex", gap: 8 }}
-        >
+        <form onSubmit={handleSearch} style={{ display: "flex", gap: 8 }}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -198,7 +234,7 @@ export default function AssignmentDashboardPage() {
                     userSelect: "none",
                   }}
                 >
-                  GitHub Username{sortIndicator("github_username")}
+                  GitHub{sortIndicator("github_username")}
                 </th>
                 <th
                   onClick={() => toggleSort("clone_status")}
@@ -212,43 +248,117 @@ export default function AssignmentDashboardPage() {
                 >
                   Repo Status{sortIndicator("clone_status")}
                 </th>
+                {sortedCheckNames.map((cn) => (
+                  <th
+                    key={cn}
+                    style={{
+                      textAlign: "center",
+                      borderBottom: "1px solid #ccc",
+                      padding: 8,
+                    }}
+                  >
+                    {cn}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.student_db_id}
-                  style={{ cursor: "pointer" }}
-                  title="Click for student detail (coming soon)"
-                >
-                  <td
-                    style={{
-                      padding: 8,
-                      borderBottom: "1px solid #eee",
-                    }}
-                  >
-                    {row.student_name}
-                  </td>
-                  <td
-                    style={{
-                      padding: 8,
-                      borderBottom: "1px solid #eee",
-                    }}
-                  >
-                    {row.github_username}
-                  </td>
-                  <td
-                    style={{
-                      padding: 8,
-                      borderBottom: "1px solid #eee",
-                      color: statusColor(row.clone_status),
-                      fontWeight: 500,
-                    }}
-                  >
-                    {row.clone_status}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const checksByName = new Map(
+                  row.check_results.map((cr) => [cr.check_name, cr])
+                );
+                const isExpanded = expandedRow === row.student_db_id;
+
+                return (
+                  <tr key={row.student_db_id}>
+                    <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                      {row.student_name}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                      {row.github_username}
+                    </td>
+                    <td
+                      style={{
+                        padding: 8,
+                        borderBottom: "1px solid #eee",
+                        color: statusColor(row.clone_status),
+                        fontWeight: 500,
+                      }}
+                    >
+                      {row.clone_status}
+                    </td>
+                    {sortedCheckNames.map((cn) => {
+                      const cr = checksByName.get(cn);
+                      if (!cr) {
+                        return (
+                          <td
+                            key={cn}
+                            style={{
+                              padding: 8,
+                              borderBottom: "1px solid #eee",
+                              textAlign: "center",
+                              color: "#999",
+                            }}
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      return (
+                        <td
+                          key={cn}
+                          style={{
+                            padding: 8,
+                            borderBottom: "1px solid #eee",
+                            textAlign: "center",
+                            cursor: "pointer",
+                          }}
+                          onClick={() =>
+                            setExpandedRow(isExpanded ? null : row.student_db_id)
+                          }
+                          title={cr.message}
+                        >
+                          <span
+                            style={{
+                              color: cr.passed ? "#2e7d32" : "#c62828",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {cr.passed ? "✓" : "✗"}
+                          </span>
+                          {isExpanded && (
+                            <div
+                              style={{
+                                textAlign: "left",
+                                fontSize: 12,
+                                marginTop: 4,
+                                padding: 8,
+                                background: "#f5f5f5",
+                                borderRadius: 4,
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              <div>
+                                <strong>Message:</strong> {cr.message}
+                              </div>
+                              {cr.details && (
+                                <div>
+                                  <strong>Details:</strong> {cr.details}
+                                </div>
+                              )}
+                              {cr.stderr && (
+                                <div style={{ color: "#c62828" }}>
+                                  <strong>Stderr:</strong> {cr.stderr}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

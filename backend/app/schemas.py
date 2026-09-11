@@ -149,3 +149,35 @@ class CloneProgress(BaseModel):
     total: int
     completed: int
     failed: int
+
+
+# ── Check Result ───────────────────────────────────────────────
+
+
+class CheckResultOut(BaseModel):
+    id: int
+    submission_id: int
+    check_name: str
+    passed: bool
+    message: str
+    details: str
+    stderr: str
+
+    model_config = {"from_attributes": True}
+
+
+class CheckProgress(BaseModel):
+    total: int
+    completed: int
+
+
+class DashboardCheckResult(BaseModel):
+    check_name: str
+    passed: bool
+    message: str
+    details: str
+    stderr: str
+
+
+class DashboardRowWithChecks(DashboardRow):
+    check_results: list[DashboardCheckResult] = []

@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -93,3 +93,21 @@ class Submission(Base):
 
     student = relationship("Student", back_populates="submissions")
     assignment = relationship("Assignment", back_populates="submissions")
+    check_results = relationship("CheckResult", back_populates="submission", cascade="all, delete-orphan")
+
+
+class CheckResult(Base):
+    __tablename__ = "check_results"
+    __table_args__ = (
+        UniqueConstraint("submission_id", "check_name", name="uq_submission_check"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False)
+    check_name = Column(String, nullable=False)
+    passed = Column(Boolean, nullable=False)
+    message = Column(String, nullable=False, default="")
+    details = Column(Text, nullable=False, default="")
+    stderr = Column(Text, nullable=False, default="")
+
+    submission = relationship("Submission", back_populates="check_results")
