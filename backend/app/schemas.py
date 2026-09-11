@@ -142,6 +142,7 @@ class DashboardRow(BaseModel):
     clone_status: str
     repo_url: str
     evaluator_grade_total: float | None = None
+    peer_grade_average: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -267,3 +268,39 @@ class BackupResult(BaseModel):
 
 class RestoreResult(BaseModel):
     message: str
+
+
+# ── Peer Assignment / Evaluation ─────────────────────────────
+
+
+class PeerAssignmentOut(BaseModel):
+    id: int
+    assignment_id: int
+    evaluator_id: int
+    evaluator_name: str
+    evaluee_id: int
+    evaluee_name: str
+    repo_url: str
+
+    model_config = {"from_attributes": True}
+
+
+class PeerEmailSendRequest(BaseModel):
+    subject: str
+    body: str
+
+
+class PeerEvaluationOut(BaseModel):
+    id: int
+    peer_assignment_id: int
+    grading_component_id: int
+    component_name: str
+    score: float
+    feedback: str
+
+    model_config = {"from_attributes": True}
+
+
+class PeerEvalImportResult(BaseModel):
+    imported: int
+    errors: list[ImportRowError]

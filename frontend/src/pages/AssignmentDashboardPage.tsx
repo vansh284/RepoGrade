@@ -161,6 +161,10 @@ export default function AssignmentDashboardPage() {
           <button type="button">Email Templates</button>
         </Link>
 
+        <Link to={`/courses/${cid}/assignments/${aid}/peer-evaluations`}>
+          <button type="button">Peer Evaluations</button>
+        </Link>
+
         {cloneProgress && (
           <span style={{ fontSize: 13 }}>
             {cloneProgress.completed}/{cloneProgress.total} cloned
@@ -281,6 +285,15 @@ export default function AssignmentDashboardPage() {
                     padding: 8,
                   }}
                 >
+                  Peer Grade
+                </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "1px solid #ccc",
+                    padding: 8,
+                  }}
+                >
                   Actions
                 </th>
               </tr>
@@ -382,6 +395,11 @@ export default function AssignmentDashboardPage() {
                     <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
                       {row.evaluator_grade_total != null
                         ? row.evaluator_grade_total
+                        : "--"}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                      {row.peer_grade_average != null
+                        ? row.peer_grade_average.toFixed(1)
                         : "--"}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>

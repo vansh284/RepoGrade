@@ -5,6 +5,7 @@ import AssignmentsPage from "./pages/AssignmentsPage";
 import EmailTemplatesPage from "./pages/EmailTemplatesPage";
 import CoursesPage from "./pages/CoursesPage";
 import GradingPage from "./pages/GradingPage";
+import PeerEvaluationsPage from "./pages/PeerEvaluationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import StudentsPage from "./pages/StudentsPage";
 
@@ -19,6 +20,7 @@ function App() {
           <Route path="/courses/:courseId/assignments/:assignmentId/dashboard" element={<AssignmentDashboardPage />} />
           <Route path="/courses/:courseId/assignments/:assignmentId/grade/:studentId" element={<GradingPage />} />
           <Route path="/courses/:courseId/assignments/:assignmentId/emails" element={<EmailTemplatesPage />} />
+          <Route path="/courses/:courseId/assignments/:assignmentId/peer-evaluations" element={<PeerEvaluationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

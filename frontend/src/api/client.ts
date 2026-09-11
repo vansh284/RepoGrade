@@ -98,6 +98,22 @@ export interface DashboardRow {
   repo_url: string;
   check_results: DashboardCheckResult[];
   evaluator_grade_total: number | null;
+  peer_grade_average: number | null;
+}
+
+export interface PeerAssignment {
+  id: number;
+  assignment_id: number;
+  evaluator_id: number;
+  evaluator_name: string;
+  evaluee_id: number;
+  evaluee_name: string;
+  repo_url: string;
+}
+
+export interface PeerEvalImportResult {
+  imported: number;
+  errors: ImportRowError[];
 }
 
 export interface EvaluatorGradeInput {
@@ -365,5 +381,47 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ filename }),
       }),
+  },
+  peerAssignments: {
+    generate: (courseId: number, assignmentId: number, count: number = 2) =>
+      request<PeerAssignment[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/peer-assignments/generate?count=${count}`,
+        { method: "POST" },
+      ),
+    list: (courseId: number, assignmentId: number) =>
+      request<PeerAssignment[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/peer-assignments`,
+      ),
+    exportUrl: (courseId: number, assignmentId: number) =>
+      `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/peer-assignments/export`,
+    sendEmails: (
+      courseId: number,
+      assignmentId: number,
+      subject: string,
+      body: string,
+    ) =>
+      request<BatchSendResult>(
+        `/courses/${courseId}/assignments/${assignmentId}/peer-assignments/send-emails`,
+        { method: "POST", body: JSON.stringify({ subject, body }) },
+      ),
+    importEvaluations: async (
+      courseId: number,
+      assignmentId: number,
+      file: File,
+    ): Promise<PeerEvalImportResult> => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/peer-evaluations/import`,
+        { method: "POST", body: form },
+      );
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`${res.status}: ${detail}`);
+      }
+      return res.json();
+    },
+    exportEvaluationsUrl: (courseId: number, assignmentId: number) =>
+      `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/peer-evaluations/export`,
   },
 };

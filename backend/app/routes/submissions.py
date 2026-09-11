@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import git_service
 from app.database import get_db
-from app.models import CheckResult, CloneStatus, EvaluatorGrade, Student, Submission
+from app.models import CheckResult, CloneStatus, EvaluatorGrade, PeerAssignment, PeerEvaluation, Student, Submission
 from app.routes.helpers import _get_assignment, _get_course
 from app.schemas import CloneProgress, DashboardCheckResult, DashboardRowWithChecks, SubmissionOut
 
@@ -156,6 +156,37 @@ def assignment_dashboard(
                 grade_totals.get(grade.submission_id, 0.0) + grade.score
             )
 
+    peer_averages: dict[int, float] = {}
+    student_ids = [s.id for s in students]
+    if student_ids:
+        pas = (
+            db.query(PeerAssignment)
+            .filter(
+                PeerAssignment.assignment_id == assignment_id,
+                PeerAssignment.evaluee_id.in_(student_ids),
+            )
+            .all()
+        )
+        pa_ids = [pa.id for pa in pas]
+        pa_evaluee_map = {pa.id: pa.evaluee_id for pa in pas}
+        if pa_ids:
+            evals = (
+                db.query(PeerEvaluation)
+                .filter(PeerEvaluation.peer_assignment_id.in_(pa_ids))
+                .all()
+            )
+            totals_by_pa: dict[int, float] = {}
+            for pe in evals:
+                totals_by_pa[pe.peer_assignment_id] = (
+                    totals_by_pa.get(pe.peer_assignment_id, 0.0) + pe.score
+                )
+            totals_by_student: dict[int, list[float]] = {}
+            for pa_id, total in totals_by_pa.items():
+                evaluee_id = pa_evaluee_map[pa_id]
+                totals_by_student.setdefault(evaluee_id, []).append(total)
+            for sid, totals in totals_by_student.items():
+                peer_averages[sid] = sum(totals) / len(totals)
+
     rows: list[DashboardRowWithChecks] = []
     for student in students:
         sub = submissions_map.get(student.id)
@@ -181,6 +212,7 @@ def assignment_dashboard(
                 repo_url=sub.repo_url if sub else repo_url,
                 check_results=checks,
                 evaluator_grade_total=grade_totals.get(sub.id) if sub else None,
+                peer_grade_average=peer_averages.get(student.id),
             )
         )
 

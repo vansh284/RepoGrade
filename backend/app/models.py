@@ -54,6 +54,7 @@ class Assignment(Base):
     environment_variables = relationship("EnvironmentVariable", back_populates="assignment", cascade="all, delete-orphan")
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")
     email_templates = relationship("EmailTemplate", back_populates="assignment", cascade="all, delete-orphan")
+    peer_assignments = relationship("PeerAssignment", back_populates="assignment", cascade="all, delete-orphan")
 
 
 class GradingComponent(Base):
@@ -148,3 +149,37 @@ class EmailTemplate(Base):
     body_template = Column(Text, nullable=False)
 
     assignment = relationship("Assignment", back_populates="email_templates")
+
+
+class PeerAssignment(Base):
+    __tablename__ = "peer_assignments"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "evaluator_id", "evaluee_id", name="uq_peer_assignment"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
+    evaluator_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    evaluee_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    repo_url = Column(String, nullable=False)
+
+    assignment = relationship("Assignment", back_populates="peer_assignments")
+    evaluator = relationship("Student", foreign_keys=[evaluator_id])
+    evaluee = relationship("Student", foreign_keys=[evaluee_id])
+    peer_evaluations = relationship("PeerEvaluation", back_populates="peer_assignment", cascade="all, delete-orphan")
+
+
+class PeerEvaluation(Base):
+    __tablename__ = "peer_evaluations"
+    __table_args__ = (
+        UniqueConstraint("peer_assignment_id", "grading_component_id", name="uq_peer_eval_component"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    peer_assignment_id = Column(Integer, ForeignKey("peer_assignments.id", ondelete="CASCADE"), nullable=False)
+    grading_component_id = Column(Integer, ForeignKey("grading_components.id", ondelete="CASCADE"), nullable=False)
+    score = Column(Float, nullable=False)
+    feedback = Column(Text, nullable=False, default="")
+
+    peer_assignment = relationship("PeerAssignment", back_populates="peer_evaluations")
+    grading_component = relationship("GradingComponent")
