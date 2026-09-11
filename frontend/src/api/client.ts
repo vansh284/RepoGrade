@@ -96,6 +96,26 @@ export interface CloneProgress {
   failed: number;
 }
 
+export interface AppSetting {
+  key: string;
+  value: string;
+}
+
+export interface BackupInfo {
+  filename: string;
+  created_at: string;
+  size_bytes: number;
+}
+
+export interface BackupResult {
+  filename: string;
+  path: string;
+}
+
+export interface RestoreResult {
+  message: string;
+}
+
 export const api = {
   courses: {
     list: () => request<Course[]>("/courses"),
@@ -189,5 +209,22 @@ export const api = {
       request<CloneProgress>(
         `/courses/${courseId}/assignments/${assignmentId}/clone/progress`,
       ),
+  },
+  settings: {
+    getBackupPath: () => request<AppSetting>("/settings/backup-path"),
+    setBackupPath: (path: string) =>
+      request<AppSetting>("/settings/backup-path", {
+        method: "PUT",
+        body: JSON.stringify({ path }),
+      }),
+  },
+  backup: {
+    create: () => request<BackupResult>("/backup", { method: "POST" }),
+    list: () => request<BackupInfo[]>("/backups"),
+    restore: (filename: string) =>
+      request<RestoreResult>("/restore", {
+        method: "POST",
+        body: JSON.stringify({ filename }),
+      }),
   },
 };
