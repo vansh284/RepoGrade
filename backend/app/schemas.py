@@ -141,6 +141,7 @@ class DashboardRow(BaseModel):
     student_db_id: int
     clone_status: str
     repo_url: str
+    evaluator_grade_total: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -181,6 +182,33 @@ class DashboardCheckResult(BaseModel):
 
 class DashboardRowWithChecks(DashboardRow):
     check_results: list[DashboardCheckResult] = []
+
+
+# ── Evaluator Grades ──────────────────────────────────────────
+
+
+class EvaluatorGradeInput(BaseModel):
+    grading_component_id: int
+    score: float
+
+
+class EvaluatorGradeSubmit(BaseModel):
+    grades: list[EvaluatorGradeInput]
+
+
+class EvaluatorGradeOut(BaseModel):
+    id: int
+    submission_id: int
+    grading_component_id: int
+    component_name: str
+    score: float
+
+    model_config = {"from_attributes": True}
+
+
+class GradeImportResult(BaseModel):
+    imported: int
+    errors: list[ImportRowError]
 
 
 # ── App Settings / Backup ──────────────────────────────────────
