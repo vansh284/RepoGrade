@@ -105,6 +105,7 @@ class Submission(Base):
     assignment = relationship("Assignment", back_populates="submissions")
     check_results = relationship("CheckResult", back_populates="submission", cascade="all, delete-orphan")
     evaluator_grades = relationship("EvaluatorGrade", back_populates="submission", cascade="all, delete-orphan")
+    penalties = relationship("Penalty", back_populates="submission", cascade="all, delete-orphan")
 
 
 class CheckResult(Base):
@@ -183,3 +184,14 @@ class PeerEvaluation(Base):
 
     peer_assignment = relationship("PeerAssignment", back_populates="peer_evaluations")
     grading_component = relationship("GradingComponent")
+
+
+class Penalty(Base):
+    __tablename__ = "penalties"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False)
+    reason = Column(Text, nullable=False)
+    amount = Column(Float, nullable=False)
+
+    submission = relationship("Submission", back_populates="penalties")

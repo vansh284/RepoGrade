@@ -6,6 +6,7 @@ import type {
   DashboardRow,
   EvaluatorGradeOut,
   GradingComponent,
+  Penalty,
 } from "../api/client";
 
 export default function GradingPage() {
@@ -25,6 +26,12 @@ export default function GradingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [newReason, setNewReason] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [editingPenalty, setEditingPenalty] = useState<number | null>(null);
+  const [editReason, setEditReason] = useState("");
+  const [editAmount, setEditAmount] = useState("");
 
   const currentIndex = rows.findIndex((r) => r.student_db_id === sid);
   const currentRow = currentIndex >= 0 ? rows[currentIndex] : null;
@@ -37,6 +44,10 @@ export default function GradingPage() {
       .catch(() => {});
   }, [cid, aid]);
 
+  const loadPenalties = () => {
+    api.penalties.list(cid, aid, sid).then(setPenalties).catch(() => setPenalties([]));
+  };
+
   useEffect(() => {
     api.grades
       .get(cid, aid, sid)
@@ -48,6 +59,7 @@ export default function GradingPage() {
         setGrades(map);
       })
       .catch(() => setGrades({}));
+    loadPenalties();
     setSaved(false);
   }, [cid, aid, sid]);
 
@@ -221,6 +233,105 @@ export default function GradingPage() {
         {saved && (
           <span style={{ color: "#2e7d32", fontWeight: 500 }}>Saved</span>
         )}
+      </div>
+
+      <div style={{ marginTop: 24, marginBottom: 16 }}>
+        <h3 style={{ marginBottom: 8 }}>Penalties</h3>
+        {penalties.length > 0 ? (
+          <table style={{ borderCollapse: "collapse", marginBottom: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ccc" }}>Reason</th>
+                <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ccc" }}>Amount</th>
+                <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ccc" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {penalties.map((p) => (
+                <tr key={p.id}>
+                  {editingPenalty === p.id ? (
+                    <>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                        <input value={editReason} onChange={(e) => setEditReason(e.target.value)} style={{ width: 200 }} />
+                      </td>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                        <input type="number" step="any" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} style={{ width: 80 }} />
+                      </td>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                        <button
+                          onClick={async () => {
+                            await api.penalties.update(cid, aid, sid, p.id, { reason: editReason, amount: parseFloat(editAmount) });
+                            setEditingPenalty(null);
+                            loadPenalties();
+                          }}
+                          style={{ fontSize: 12, marginRight: 4 }}
+                        >
+                          Save
+                        </button>
+                        <button onClick={() => setEditingPenalty(null)} style={{ fontSize: 12 }}>Cancel</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>{p.reason}</td>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee", color: "#c62828" }}>-{p.amount}</td>
+                      <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                        <button
+                          onClick={() => { setEditingPenalty(p.id); setEditReason(p.reason); setEditAmount(String(p.amount)); }}
+                          style={{ fontSize: 12, marginRight: 4 }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => { await api.penalties.delete(cid, aid, sid, p.id); loadPenalties(); }}
+                          style={{ fontSize: 12, color: "#c62828" }}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+              <tr>
+                <td style={{ padding: 8, fontWeight: 600 }} colSpan={1}>Total</td>
+                <td style={{ padding: 8, fontWeight: 600, color: "#c62828" }}>
+                  -{penalties.reduce((s, p) => s + p.amount, 0)}
+                </td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p style={{ color: "#999", marginBottom: 12 }}>No penalties.</p>
+        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={newReason}
+            onChange={(e) => setNewReason(e.target.value)}
+            placeholder="Reason"
+            style={{ width: 200 }}
+          />
+          <input
+            type="number"
+            step="any"
+            value={newAmount}
+            onChange={(e) => setNewAmount(e.target.value)}
+            placeholder="Amount"
+            style={{ width: 80 }}
+          />
+          <button
+            onClick={async () => {
+              if (!newReason || !newAmount) return;
+              await api.penalties.add(cid, aid, sid, { reason: newReason, amount: parseFloat(newAmount) });
+              setNewReason("");
+              setNewAmount("");
+              loadPenalties();
+            }}
+          >
+            Add Penalty
+          </button>
+        </div>
       </div>
 
       <div

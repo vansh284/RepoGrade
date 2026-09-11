@@ -165,6 +165,10 @@ export default function AssignmentDashboardPage() {
           <button type="button">Peer Evaluations</button>
         </Link>
 
+        <a href={api.grades.canvasExportUrl(cid, aid)} download>
+          <button type="button">Canvas Export</button>
+        </a>
+
         {cloneProgress && (
           <span style={{ fontSize: 13 }}>
             {cloneProgress.completed}/{cloneProgress.total} cloned
@@ -294,6 +298,24 @@ export default function AssignmentDashboardPage() {
                     padding: 8,
                   }}
                 >
+                  Penalties
+                </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "1px solid #ccc",
+                    padding: 8,
+                  }}
+                >
+                  Final Grade
+                </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "1px solid #ccc",
+                    padding: 8,
+                  }}
+                >
                   Actions
                 </th>
               </tr>
@@ -400,6 +422,28 @@ export default function AssignmentDashboardPage() {
                     <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
                       {row.peer_grade_average != null
                         ? row.peer_grade_average.toFixed(1)
+                        : "--"}
+                    </td>
+                    <td
+                      style={{
+                        padding: 8,
+                        borderBottom: "1px solid #eee",
+                        color: row.penalty_total > 0 ? "#c62828" : undefined,
+                      }}
+                    >
+                      {row.penalty_count > 0
+                        ? `${row.penalty_count} (-${row.penalty_total})`
+                        : "--"}
+                    </td>
+                    <td
+                      style={{
+                        padding: 8,
+                        borderBottom: "1px solid #eee",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {row.final_grade != null
+                        ? row.final_grade.toFixed(2)
                         : "--"}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>

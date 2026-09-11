@@ -143,6 +143,9 @@ class DashboardRow(BaseModel):
     repo_url: str
     evaluator_grade_total: float | None = None
     peer_grade_average: float | None = None
+    final_grade: float | None = None
+    penalty_count: int = 0
+    penalty_total: float = 0.0
 
     model_config = {"from_attributes": True}
 
@@ -304,3 +307,23 @@ class PeerEvaluationOut(BaseModel):
 class PeerEvalImportResult(BaseModel):
     imported: int
     errors: list[ImportRowError]
+
+
+# ── Penalty ──────────────────────────────────────────────────
+
+
+class PenaltyCreate(BaseModel):
+    reason: str
+    amount: float
+
+
+PenaltyUpdate = PenaltyCreate
+
+
+class PenaltyOut(BaseModel):
+    id: int
+    submission_id: int
+    reason: str
+    amount: float
+
+    model_config = {"from_attributes": True}

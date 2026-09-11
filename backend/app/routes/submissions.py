@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import git_service
 from app.database import get_db
-from app.models import CheckResult, CloneStatus, EvaluatorGrade, PeerAssignment, PeerEvaluation, Student, Submission
+from app.models import CheckResult, CloneStatus, EvaluatorGrade, GradingComponent, PeerAssignment, PeerEvaluation, Penalty, Student, Submission
 from app.routes.helpers import _get_assignment, _get_course
 from app.schemas import CloneProgress, DashboardCheckResult, DashboardRowWithChecks, SubmissionOut
 
@@ -157,6 +157,7 @@ def assignment_dashboard(
             )
 
     peer_averages: dict[int, float] = {}
+    peer_avg_by_student_component: dict[int, dict[int, float]] = {}
     student_ids = [s.id for s in students]
     if student_ids:
         pas = (
@@ -176,16 +177,47 @@ def assignment_dashboard(
                 .all()
             )
             totals_by_pa: dict[int, float] = {}
+            scores_by_student_component: dict[int, dict[int, list[float]]] = {}
             for pe in evals:
                 totals_by_pa[pe.peer_assignment_id] = (
                     totals_by_pa.get(pe.peer_assignment_id, 0.0) + pe.score
                 )
+                evaluee_id = pa_evaluee_map[pe.peer_assignment_id]
+                scores_by_student_component.setdefault(evaluee_id, {}).setdefault(
+                    pe.grading_component_id, []
+                ).append(pe.score)
             totals_by_student: dict[int, list[float]] = {}
             for pa_id, total in totals_by_pa.items():
                 evaluee_id = pa_evaluee_map[pa_id]
                 totals_by_student.setdefault(evaluee_id, []).append(total)
             for sid, totals in totals_by_student.items():
                 peer_averages[sid] = sum(totals) / len(totals)
+            for sid, comp_scores in scores_by_student_component.items():
+                peer_avg_by_student_component[sid] = {
+                    gc_id: sum(scores) / len(scores)
+                    for gc_id, scores in comp_scores.items()
+                }
+
+    penalty_map: dict[int, tuple[int, float]] = {}
+    if submission_ids:
+        for p in (
+            db.query(Penalty)
+            .filter(Penalty.submission_id.in_(submission_ids))
+            .all()
+        ):
+            count, total = penalty_map.get(p.submission_id, (0, 0.0))
+            penalty_map[p.submission_id] = (count + 1, total + p.amount)
+
+    eval_grades_by_sub: dict[int, dict[int, float]] = {}
+    if submission_ids:
+        for g in (
+            db.query(EvaluatorGrade)
+            .filter(EvaluatorGrade.submission_id.in_(submission_ids))
+            .all()
+        ):
+            eval_grades_by_sub.setdefault(g.submission_id, {})[g.grading_component_id] = g.score
+
+    components = assignment.grading_components
 
     rows: list[DashboardRowWithChecks] = []
     for student in students:
@@ -203,6 +235,29 @@ def assignment_dashboard(
                         stderr=cr.stderr,
                     )
                 )
+
+        final_grade = None
+        pen_count = 0
+        pen_total = 0.0
+        if sub:
+            pen_count, pen_total = penalty_map.get(sub.id, (0, 0.0))
+            sub_eval = eval_grades_by_sub.get(sub.id, {})
+            sub_peer = peer_avg_by_student_component.get(student.id, {})
+            has_any = False
+            fg = 0.0
+            for gc in components:
+                es = sub_eval.get(gc.id)
+                ps = sub_peer.get(gc.id)
+                if es is not None or ps is not None:
+                    has_any = True
+                    consolidated = (
+                        assignment.evaluator_weight * (es or 0.0)
+                        + assignment.peer_weight * (ps or 0.0)
+                    )
+                    fg += gc.weight * consolidated
+            if has_any:
+                final_grade = round(fg - pen_total, 4)
+
         rows.append(
             DashboardRowWithChecks(
                 student_name=student.name,
@@ -213,6 +268,9 @@ def assignment_dashboard(
                 check_results=checks,
                 evaluator_grade_total=grade_totals.get(sub.id) if sub else None,
                 peer_grade_average=peer_averages.get(student.id),
+                final_grade=final_grade,
+                penalty_count=pen_count,
+                penalty_total=pen_total,
             )
         )
 

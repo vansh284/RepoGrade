@@ -99,6 +99,21 @@ export interface DashboardRow {
   check_results: DashboardCheckResult[];
   evaluator_grade_total: number | null;
   peer_grade_average: number | null;
+  final_grade: number | null;
+  penalty_count: number;
+  penalty_total: number;
+}
+
+export interface Penalty {
+  id: number;
+  submission_id: number;
+  reason: string;
+  amount: number;
+}
+
+export interface PenaltyInput {
+  reason: string;
+  amount: number;
 }
 
 export interface PeerAssignment {
@@ -334,6 +349,29 @@ export const api = {
     },
     exportUrl: (courseId: number, assignmentId: number) =>
       `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/grades/export`,
+    canvasExportUrl: (courseId: number, assignmentId: number) =>
+      `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/canvas-export`,
+  },
+  penalties: {
+    list: (courseId: number, assignmentId: number, studentDbId: number) =>
+      request<Penalty[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/penalties`,
+      ),
+    add: (courseId: number, assignmentId: number, studentDbId: number, data: PenaltyInput) =>
+      request<Penalty>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/penalties`,
+        { method: "POST", body: JSON.stringify(data) },
+      ),
+    update: (courseId: number, assignmentId: number, studentDbId: number, penaltyId: number, data: PenaltyInput) =>
+      request<Penalty>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/penalties/${penaltyId}`,
+        { method: "PUT", body: JSON.stringify(data) },
+      ),
+    delete: (courseId: number, assignmentId: number, studentDbId: number, penaltyId: number) =>
+      request<void>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/penalties/${penaltyId}`,
+        { method: "DELETE" },
+      ),
   },
   emailTemplates: {
     list: (courseId: number, assignmentId: number) =>

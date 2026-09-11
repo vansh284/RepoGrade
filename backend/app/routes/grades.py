@@ -11,6 +11,9 @@ from app.models import (
     Course,
     EvaluatorGrade,
     GradingComponent,
+    PeerAssignment,
+    PeerEvaluation,
+    Penalty,
     Student,
     Submission,
 )
@@ -308,4 +311,167 @@ def export_grades_csv(
         iter([buf.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=grades.csv"},
+    )
+
+
+def _parse_name_last_first(name: str) -> tuple[str, bool]:
+    """Attempt to reformat 'First Last' to 'Last, First'. Returns (formatted, success)."""
+    if "," in name:
+        return name, True
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        return f"{parts[-1]}, {' '.join(parts[:-1])}", True
+    return name, False
+
+
+def _compute_final_grades(
+    db: Session, assignment: Assignment, students: list[Student],
+) -> list[dict]:
+    components = assignment.grading_components
+    component_map = {gc.id: gc for gc in components}
+
+    subs = (
+        db.query(Submission)
+        .filter(Submission.assignment_id == assignment.id)
+        .all()
+    )
+    subs_by_student: dict[int, Submission] = {s.student_id: s for s in subs}
+    sub_ids = [s.id for s in subs]
+
+    eval_grades: dict[int, dict[int, float]] = {}
+    if sub_ids:
+        for g in (
+            db.query(EvaluatorGrade)
+            .filter(EvaluatorGrade.submission_id.in_(sub_ids))
+            .all()
+        ):
+            eval_grades.setdefault(g.submission_id, {})[g.grading_component_id] = g.score
+
+    student_ids = [s.id for s in students]
+    peer_avg_by_student_component: dict[int, dict[int, float]] = {}
+    if student_ids:
+        pas = (
+            db.query(PeerAssignment)
+            .filter(
+                PeerAssignment.assignment_id == assignment.id,
+                PeerAssignment.evaluee_id.in_(student_ids),
+            )
+            .all()
+        )
+        pa_ids = [pa.id for pa in pas]
+        pa_evaluee_map = {pa.id: pa.evaluee_id for pa in pas}
+        if pa_ids:
+            evals = (
+                db.query(PeerEvaluation)
+                .filter(PeerEvaluation.peer_assignment_id.in_(pa_ids))
+                .all()
+            )
+            scores_by_student_component: dict[int, dict[int, list[float]]] = {}
+            for pe in evals:
+                evaluee_id = pa_evaluee_map[pe.peer_assignment_id]
+                scores_by_student_component.setdefault(evaluee_id, {}).setdefault(
+                    pe.grading_component_id, []
+                ).append(pe.score)
+            for sid, comp_scores in scores_by_student_component.items():
+                peer_avg_by_student_component[sid] = {
+                    gc_id: sum(scores) / len(scores)
+                    for gc_id, scores in comp_scores.items()
+                }
+
+    penalty_totals: dict[int, float] = {}
+    if sub_ids:
+        for p in (
+            db.query(Penalty)
+            .filter(Penalty.submission_id.in_(sub_ids))
+            .all()
+        ):
+            penalty_totals[p.submission_id] = (
+                penalty_totals.get(p.submission_id, 0.0) + p.amount
+            )
+
+    results = []
+    name_warnings: list[str] = []
+    for student in students:
+        sub = subs_by_student.get(student.id)
+        formatted_name, name_ok = _parse_name_last_first(student.name)
+        if not name_ok:
+            name_warnings.append(student.name)
+
+        component_scores: dict[str, float] = {}
+        final = 0.0
+        has_any_grade = False
+
+        if sub:
+            sub_eval = eval_grades.get(sub.id, {})
+            sub_peer = peer_avg_by_student_component.get(student.id, {})
+
+            for gc in components:
+                eval_score = sub_eval.get(gc.id)
+                peer_score = sub_peer.get(gc.id)
+
+                if eval_score is not None or peer_score is not None:
+                    has_any_grade = True
+                    consolidated = (
+                        assignment.evaluator_weight * (eval_score or 0.0)
+                        + assignment.peer_weight * (peer_score or 0.0)
+                    )
+                    component_scores[gc.name] = round(consolidated, 4)
+                    final += gc.weight * consolidated
+
+            penalty = penalty_totals.get(sub.id, 0.0)
+            final -= penalty
+
+        results.append({
+            "student_name": formatted_name,
+            "student_id": student.student_id,
+            "email": student.email,
+            "component_scores": component_scores,
+            "final_grade": round(final, 4) if has_any_grade else None,
+            "name_warning": not name_ok,
+        })
+
+    return results
+
+
+@router.get("/api/courses/{course_id}/assignments/{assignment_id}/canvas-export")
+def canvas_export_csv(
+    course_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+):
+    _get_course(db, course_id)
+    assignment = _get_assignment(db, course_id, assignment_id)
+    students = db.query(Student).filter(Student.course_id == assignment.course_id).all()
+
+    grade_data = _compute_final_grades(db, assignment, students)
+
+    component_names = [gc.name for gc in assignment.grading_components]
+    fieldnames = ["Student", "ID", "SIS Login ID"] + component_names + ["Final Grade"]
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for entry in grade_data:
+        row: dict[str, str] = {
+            "Student": entry["student_name"],
+            "ID": entry["student_id"],
+            "SIS Login ID": entry["email"],
+        }
+        for cn in component_names:
+            score = entry["component_scores"].get(cn)
+            row[cn] = str(score) if score is not None else ""
+        row["Final Grade"] = str(entry["final_grade"]) if entry["final_grade"] is not None else ""
+        writer.writerow(row)
+
+    buf.seek(0)
+    warnings = [e["student_name"] for e in grade_data if e["name_warning"]]
+    headers = {"Content-Disposition": "attachment; filename=canvas_grades.csv"}
+    if warnings:
+        headers["X-Name-Warnings"] = ",".join(warnings)
+
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers=headers,
     )
