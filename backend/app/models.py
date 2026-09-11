@@ -78,6 +78,14 @@ class EnvironmentVariable(Base):
     assignment = relationship("Assignment", back_populates="environment_variables")
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, nullable=False)
+    value = Column(String, nullable=False)
+
+
 class Submission(Base):
     __tablename__ = "submissions"
     __table_args__ = (

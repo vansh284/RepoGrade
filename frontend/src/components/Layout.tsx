@@ -24,6 +24,18 @@ export default function Layout() {
         >
           Courses
         </NavLink>
+        <NavLink
+          to="/settings"
+          style={({ isActive }) => ({
+            display: "block",
+            padding: "8px 0",
+            textDecoration: "none",
+            fontWeight: isActive ? "bold" : "normal",
+            color: isActive ? "#1a73e8" : "#333",
+          })}
+        >
+          Settings
+        </NavLink>
       </nav>
       <main style={{ flex: 1, padding: 24 }}>
         <Outlet />

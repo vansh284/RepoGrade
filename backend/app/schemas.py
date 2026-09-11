@@ -181,3 +181,28 @@ class DashboardCheckResult(BaseModel):
 
 class DashboardRowWithChecks(DashboardRow):
     check_results: list[DashboardCheckResult] = []
+
+
+# ── App Settings / Backup ──────────────────────────────────────
+
+
+class AppSettingOut(BaseModel):
+    key: str
+    value: str
+
+    model_config = {"from_attributes": True}
+
+
+class BackupInfo(BaseModel):
+    filename: str
+    created_at: str
+    size_bytes: int
+
+
+class BackupResult(BaseModel):
+    filename: str
+    path: str
+
+
+class RestoreResult(BaseModel):
+    message: str

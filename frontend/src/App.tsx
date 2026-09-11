@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import AssignmentDashboardPage from "./pages/AssignmentDashboardPage";
 import AssignmentsPage from "./pages/AssignmentsPage";
 import CoursesPage from "./pages/CoursesPage";
+import SettingsPage from "./pages/SettingsPage";
 import StudentsPage from "./pages/StudentsPage";
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
           <Route path="/courses/:courseId/students" element={<StudentsPage />} />
           <Route path="/courses/:courseId/assignments" element={<AssignmentsPage />} />
           <Route path="/courses/:courseId/assignments/:assignmentId/dashboard" element={<AssignmentDashboardPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
