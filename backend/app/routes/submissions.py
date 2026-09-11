@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import git_service
 from app.database import get_db
-from app.models import Assignment, CloneStatus, Course, Student, Submission
+from app.models import Assignment, CloneStatus, Course, EvaluatorGrade, Student, Submission
 from app.schemas import CloneProgress, DashboardRow, SubmissionOut
 
 router = APIRouter(tags=["submissions"])
@@ -152,6 +152,19 @@ def assignment_dashboard(
     ):
         submissions_map[sub.student_id] = sub
 
+    # Pre-load evaluator grade totals per submission
+    sub_ids = [s.id for s in submissions_map.values()]
+    grade_totals: dict[int, float] = {}
+    if sub_ids:
+        for grade in (
+            db.query(EvaluatorGrade)
+            .filter(EvaluatorGrade.submission_id.in_(sub_ids))
+            .all()
+        ):
+            grade_totals[grade.submission_id] = (
+                grade_totals.get(grade.submission_id, 0.0) + grade.score
+            )
+
     rows: list[DashboardRow] = []
     for student in students:
         sub = submissions_map.get(student.id)
@@ -163,6 +176,7 @@ def assignment_dashboard(
                 student_db_id=student.id,
                 clone_status=sub.clone_status.value if sub else "pending",
                 repo_url=sub.repo_url if sub else repo_url,
+                evaluator_grade_total=grade_totals.get(sub.id) if sub else None,
             )
         )
 

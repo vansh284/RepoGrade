@@ -93,3 +93,19 @@ class Submission(Base):
 
     student = relationship("Student", back_populates="submissions")
     assignment = relationship("Assignment", back_populates="submissions")
+    evaluator_grades = relationship("EvaluatorGrade", back_populates="submission", cascade="all, delete-orphan")
+
+
+class EvaluatorGrade(Base):
+    __tablename__ = "evaluator_grades"
+    __table_args__ = (
+        UniqueConstraint("submission_id", "grading_component_id", name="uq_submission_component"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False)
+    grading_component_id = Column(Integer, ForeignKey("grading_components.id", ondelete="CASCADE"), nullable=False)
+    score = Column(Float, nullable=False)
+
+    submission = relationship("Submission", back_populates="evaluator_grades")
+    grading_component = relationship("GradingComponent")

@@ -88,6 +88,25 @@ export interface DashboardRow {
   student_db_id: number;
   clone_status: string;
   repo_url: string;
+  evaluator_grade_total: number | null;
+}
+
+export interface EvaluatorGradeInput {
+  grading_component_id: number;
+  score: number;
+}
+
+export interface EvaluatorGradeOut {
+  id: number;
+  submission_id: number;
+  grading_component_id: number;
+  component_name: string;
+  score: number;
+}
+
+export interface GradeImportResult {
+  imported: number;
+  errors: ImportRowError[];
 }
 
 export interface CloneProgress {
@@ -189,5 +208,43 @@ export const api = {
       request<CloneProgress>(
         `/courses/${courseId}/assignments/${assignmentId}/clone/progress`,
       ),
+  },
+  grades: {
+    get: (courseId: number, assignmentId: number, studentDbId: number) =>
+      request<EvaluatorGradeOut[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/grades`,
+      ),
+    submit: (
+      courseId: number,
+      assignmentId: number,
+      studentDbId: number,
+      grades: EvaluatorGradeInput[],
+    ) =>
+      request<EvaluatorGradeOut[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/students/${studentDbId}/grades`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ grades }),
+        },
+      ),
+    import: async (
+      courseId: number,
+      assignmentId: number,
+      file: File,
+    ): Promise<GradeImportResult> => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/grades/import`,
+        { method: "POST", body: form },
+      );
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`${res.status}: ${detail}`);
+      }
+      return res.json();
+    },
+    exportUrl: (courseId: number, assignmentId: number) =>
+      `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/grades/export`,
   },
 };

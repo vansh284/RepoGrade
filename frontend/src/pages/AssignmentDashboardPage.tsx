@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { DashboardRow, CloneProgress } from "../api/client";
 
@@ -12,6 +12,7 @@ export default function AssignmentDashboardPage() {
   }>();
   const cid = Number(courseId);
   const aid = Number(assignmentId);
+  const navigate = useNavigate();
 
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [error, setError] = useState("");
@@ -212,6 +213,24 @@ export default function AssignmentDashboardPage() {
                 >
                   Repo Status{sortIndicator("clone_status")}
                 </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "1px solid #ccc",
+                    padding: 8,
+                  }}
+                >
+                  Evaluator Grade
+                </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "1px solid #ccc",
+                    padding: 8,
+                  }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -246,6 +265,33 @@ export default function AssignmentDashboardPage() {
                     }}
                   >
                     {row.clone_status}
+                  </td>
+                  <td
+                    style={{
+                      padding: 8,
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    {row.evaluator_grade_total != null
+                      ? row.evaluator_grade_total
+                      : "--"}
+                  </td>
+                  <td
+                    style={{
+                      padding: 8,
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/courses/${cid}/assignments/${aid}/grade/${row.student_db_id}`,
+                        )
+                      }
+                      style={{ fontSize: 12 }}
+                    >
+                      Grade
+                    </button>
                   </td>
                 </tr>
               ))}
