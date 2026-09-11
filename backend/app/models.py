@@ -53,6 +53,7 @@ class Assignment(Base):
     grading_components = relationship("GradingComponent", back_populates="assignment", cascade="all, delete-orphan")
     environment_variables = relationship("EnvironmentVariable", back_populates="assignment", cascade="all, delete-orphan")
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")
+    email_templates = relationship("EmailTemplate", back_populates="assignment", cascade="all, delete-orphan")
 
 
 class GradingComponent(Base):
@@ -135,3 +136,15 @@ class EvaluatorGrade(Base):
 
     submission = relationship("Submission", back_populates="evaluator_grades")
     grading_component = relationship("GradingComponent")
+
+
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    subject_template = Column(String, nullable=False)
+    body_template = Column(Text, nullable=False)
+
+    assignment = relationship("Assignment", back_populates="email_templates")

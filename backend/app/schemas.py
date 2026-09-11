@@ -211,6 +211,39 @@ class GradeImportResult(BaseModel):
     errors: list[ImportRowError]
 
 
+# ── Email Template ────────────────────────────────────────────
+
+
+class EmailTemplateCreate(BaseModel):
+    name: str
+    subject_template: str
+    body_template: str
+
+
+EmailTemplateUpdate = EmailTemplateCreate
+
+
+class EmailTemplateOut(BaseModel):
+    id: int
+    assignment_id: int
+    name: str
+    subject_template: str
+    body_template: str
+
+    model_config = {"from_attributes": True}
+
+
+class EmailPreview(BaseModel):
+    subject: str
+    body: str
+
+
+class BatchSendResult(BaseModel):
+    sent: int
+    failed: int
+    errors: list[str] = []
+
+
 # ── App Settings / Backup ──────────────────────────────────────
 
 

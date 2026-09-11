@@ -157,6 +157,10 @@ export default function AssignmentDashboardPage() {
           <button type="button">Export CSV</button>
         </a>
 
+        <Link to={`/courses/${cid}/assignments/${aid}/emails`}>
+          <button type="button">Email Templates</button>
+        </Link>
+
         {cloneProgress && (
           <span style={{ fontSize: 13 }}>
             {cloneProgress.completed}/{cloneProgress.total} cloned
