@@ -199,7 +199,7 @@ export default function AssignmentsPage() {
                 Evaluator Weight
                 <input
                   type="number"
-                  step="0.1"
+                  step="0.01"
                   min="0"
                   max="1"
                   value={form.evaluator_weight}
@@ -211,7 +211,7 @@ export default function AssignmentsPage() {
                 Peer Weight
                 <input
                   type="number"
-                  step="0.1"
+                  step="0.01"
                   min="0"
                   max="1"
                   value={form.peer_weight}
@@ -249,7 +249,7 @@ export default function AssignmentsPage() {
                   {idx === 0 && "Weight"}
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={gc.weight}
                     onChange={(e) => updateComponent(idx, "weight", parseFloat(e.target.value) || 0)}
                     style={{ width: "100%", display: "block", marginTop: idx === 0 ? 4 : 0 }}
