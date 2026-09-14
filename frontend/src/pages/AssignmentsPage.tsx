@@ -14,6 +14,8 @@ const emptyForm: AssignmentInput = {
   checks_directory: "",
   evaluator_weight: 0.7,
   peer_weight: 0.3,
+  num_main_evaluators: null,
+  num_peer_evaluators: null,
   grading_components: [],
   environment_variables: [],
 };
@@ -63,6 +65,8 @@ export default function AssignmentsPage() {
       checks_directory: a.checks_directory,
       evaluator_weight: a.evaluator_weight,
       peer_weight: a.peer_weight,
+      num_main_evaluators: a.num_main_evaluators,
+      num_peer_evaluators: a.num_peer_evaluators,
       grading_components: a.grading_components.map(({ name, max_points, weight }) => ({
         name,
         max_points,
@@ -216,6 +220,36 @@ export default function AssignmentsPage() {
                   max="1"
                   value={form.peer_weight}
                   onChange={(e) => updateField("peer_weight", parseFloat(e.target.value) || 0)}
+                  style={{ width: "100%", display: "block", marginTop: 4 }}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <label style={{ flex: 1 }}>
+                Expected Main Evaluators
+                <input
+                  type="number"
+                  min="0"
+                  value={form.num_main_evaluators ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateField("num_main_evaluators", v === "" ? null as any : parseInt(v) || 0);
+                  }}
+                  placeholder="Not set (no auto-weight)"
+                  style={{ width: "100%", display: "block", marginTop: 4 }}
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                Expected Peer Evaluators
+                <input
+                  type="number"
+                  min="0"
+                  value={form.num_peer_evaluators ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateField("num_peer_evaluators", v === "" ? null as any : parseInt(v) || 0);
+                  }}
+                  placeholder="Not set (no auto-weight)"
                   style={{ width: "100%", display: "block", marginTop: 4 }}
                 />
               </label>

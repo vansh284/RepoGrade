@@ -157,7 +157,8 @@ def assignment_dashboard(
             )
 
     peer_averages: dict[int, float] = {}
-    peer_avg_by_student_component: dict[int, dict[int, float]] = {}
+    peer_scores_by_student_comp: dict[int, dict[int, list[float]]] = {}
+    peer_evaluator_counts: dict[int, int] = {}
     student_ids = [s.id for s in students]
     if student_ids:
         pas = (
@@ -177,26 +178,24 @@ def assignment_dashboard(
                 .all()
             )
             totals_by_pa: dict[int, float] = {}
-            scores_by_student_component: dict[int, dict[int, list[float]]] = {}
+            peer_assignments_with_evals: dict[int, set[int]] = {}
             for pe in evals:
                 totals_by_pa[pe.peer_assignment_id] = (
                     totals_by_pa.get(pe.peer_assignment_id, 0.0) + pe.score
                 )
                 evaluee_id = pa_evaluee_map[pe.peer_assignment_id]
-                scores_by_student_component.setdefault(evaluee_id, {}).setdefault(
+                peer_scores_by_student_comp.setdefault(evaluee_id, {}).setdefault(
                     pe.grading_component_id, []
                 ).append(pe.score)
+                peer_assignments_with_evals.setdefault(evaluee_id, set()).add(pe.peer_assignment_id)
             totals_by_student: dict[int, list[float]] = {}
             for pa_id, total in totals_by_pa.items():
                 evaluee_id = pa_evaluee_map[pa_id]
                 totals_by_student.setdefault(evaluee_id, []).append(total)
             for sid, totals in totals_by_student.items():
                 peer_averages[sid] = sum(totals) / len(totals)
-            for sid, comp_scores in scores_by_student_component.items():
-                peer_avg_by_student_component[sid] = {
-                    gc_id: sum(scores) / len(scores)
-                    for gc_id, scores in comp_scores.items()
-                }
+            for sid, pa_set in peer_assignments_with_evals.items():
+                peer_evaluator_counts[sid] = len(pa_set)
 
     penalty_map: dict[int, tuple[int, float]] = {}
     if submission_ids:
@@ -208,16 +207,20 @@ def assignment_dashboard(
             count, total = penalty_map.get(p.submission_id, (0, 0.0))
             penalty_map[p.submission_id] = (count + 1, total + p.amount)
 
-    eval_grades_by_sub: dict[int, dict[int, float]] = {}
+    eval_scores_by_sub_comp: dict[int, dict[int, list[float]]] = {}
     if submission_ids:
         for g in (
             db.query(EvaluatorGrade)
             .filter(EvaluatorGrade.submission_id.in_(submission_ids))
             .all()
         ):
-            eval_grades_by_sub.setdefault(g.submission_id, {})[g.grading_component_id] = g.score
+            eval_scores_by_sub_comp.setdefault(g.submission_id, {}).setdefault(
+                g.grading_component_id, []
+            ).append(g.score)
 
     components = assignment.grading_components
+    num_main_expected = assignment.num_main_evaluators
+    num_peer_expected = assignment.num_peer_evaluators
 
     rows: list[DashboardRowWithChecks] = []
     for student in students:
@@ -239,21 +242,47 @@ def assignment_dashboard(
         final_grade = None
         pen_count = 0
         pen_total = 0.0
+        incomplete_pools: list[str] = []
         if sub:
             pen_count, pen_total = penalty_map.get(sub.id, (0, 0.0))
-            sub_eval = eval_grades_by_sub.get(sub.id, {})
-            sub_peer = peer_avg_by_student_component.get(student.id, {})
+            sub_eval_scores = eval_scores_by_sub_comp.get(sub.id, {})
+            sub_peer_scores = peer_scores_by_student_comp.get(student.id, {})
+
+            main_eval_count = 0
+            if sub_eval_scores:
+                main_eval_count = len(next(iter(sub_eval_scores.values())))
+            peer_eval_count = peer_evaluator_counts.get(student.id, 0)
+
+            if num_main_expected is not None and num_main_expected > 0 and main_eval_count == 0:
+                incomplete_pools.append("evaluator")
+            if num_peer_expected is not None and num_peer_expected > 0 and peer_eval_count == 0:
+                incomplete_pools.append("peer")
+
+            ew = assignment.evaluator_weight
+            pw = assignment.peer_weight
+
+            if num_main_expected is not None or num_peer_expected is not None:
+                eval_has_grades = main_eval_count > 0
+                peer_has_grades = peer_eval_count > 0
+                if not eval_has_grades and not peer_has_grades:
+                    ew, pw = 0.0, 0.0
+                elif not eval_has_grades and peer_has_grades:
+                    pw = ew + pw
+                    ew = 0.0
+                elif eval_has_grades and not peer_has_grades:
+                    ew = ew + pw
+                    pw = 0.0
+
             has_any = False
             fg = 0.0
             for gc in components:
-                es = sub_eval.get(gc.id)
-                ps = sub_peer.get(gc.id)
+                eval_list = sub_eval_scores.get(gc.id, [])
+                peer_list = sub_peer_scores.get(gc.id, [])
+                es = sum(eval_list) / len(eval_list) if eval_list else None
+                ps = sum(peer_list) / len(peer_list) if peer_list else None
                 if es is not None or ps is not None:
                     has_any = True
-                    consolidated = (
-                        assignment.evaluator_weight * (es or 0.0)
-                        + assignment.peer_weight * (ps or 0.0)
-                    )
+                    consolidated = ew * (es or 0.0) + pw * (ps or 0.0)
                     fg += gc.weight * consolidated
             if has_any:
                 final_grade = round(fg - pen_total, 4)
@@ -271,6 +300,7 @@ def assignment_dashboard(
                 final_grade=final_grade,
                 penalty_count=pen_count,
                 penalty_total=pen_total,
+                incomplete_pools=incomplete_pools,
             )
         )
 

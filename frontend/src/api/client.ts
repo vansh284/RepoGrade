@@ -68,6 +68,8 @@ export interface Assignment {
   checks_directory: string;
   evaluator_weight: number;
   peer_weight: number;
+  num_main_evaluators: number | null;
+  num_peer_evaluators: number | null;
   grading_components: GradingComponent[];
   environment_variables: EnvVar[];
 }
@@ -78,6 +80,8 @@ export interface AssignmentInput {
   checks_directory: string;
   evaluator_weight: number;
   peer_weight: number;
+  num_main_evaluators: number | null;
+  num_peer_evaluators: number | null;
   grading_components: GradingComponentInput[];
   environment_variables: EnvVarInput[];
 }
@@ -102,6 +106,7 @@ export interface DashboardRow {
   final_grade: number | null;
   penalty_count: number;
   penalty_total: number;
+  incomplete_pools: string[];
 }
 
 export interface Penalty {
@@ -183,6 +188,12 @@ export interface BatchSendResult {
   sent: number;
   failed: number;
   errors: string[];
+}
+
+export interface EmailDraft {
+  to: string;
+  subject: string;
+  body: string;
 }
 
 export interface AppSetting {
@@ -402,6 +413,23 @@ export const api = {
         `/courses/${courseId}/assignments/${assignmentId}/email-templates/${templateId}/send?check_name=${encodeURIComponent(checkName)}`,
         { method: "POST" },
       ),
+    generateDrafts: (courseId: number, assignmentId: number, templateId: number, params: { check_name?: string; scope?: string }) => {
+      const q = new URLSearchParams();
+      if (params.check_name) q.set("check_name", params.check_name);
+      if (params.scope) q.set("scope", params.scope);
+      const qs = q.toString();
+      return request<EmailDraft[]>(
+        `/courses/${courseId}/assignments/${assignmentId}/email-templates/${templateId}/generate-drafts${qs ? `?${qs}` : ""}`,
+        { method: "POST" },
+      );
+    },
+    downloadDraftsUrl: (courseId: number, assignmentId: number, templateId: number, params: { check_name?: string; scope?: string }) => {
+      const q = new URLSearchParams();
+      if (params.check_name) q.set("check_name", params.check_name);
+      if (params.scope) q.set("scope", params.scope);
+      const qs = q.toString();
+      return `${API_BASE}/courses/${courseId}/assignments/${assignmentId}/email-templates/${templateId}/generate-drafts/download${qs ? `?${qs}` : ""}`;
+    },
   },
   settings: {
     getBackupPath: () => request<AppSetting>("/settings/backup-path"),

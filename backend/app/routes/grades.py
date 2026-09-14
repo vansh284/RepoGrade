@@ -65,6 +65,7 @@ def _grade_to_out(grade: EvaluatorGrade) -> EvaluatorGradeOut:
         submission_id=grade.submission_id,
         grading_component_id=grade.grading_component_id,
         component_name=grade.grading_component.name,
+        evaluator_id=grade.evaluator_id,
         score=grade.score,
     )
 
@@ -93,12 +94,14 @@ def submit_grades(
                 detail=f"Grading component {g.grading_component_id} not found in this assignment",
             )
 
+    evaluator_id = data.evaluator_id
     for g in data.grades:
         existing = (
             db.query(EvaluatorGrade)
             .filter(
                 EvaluatorGrade.submission_id == sub.id,
                 EvaluatorGrade.grading_component_id == g.grading_component_id,
+                EvaluatorGrade.evaluator_id == evaluator_id,
             )
             .first()
         )
@@ -109,6 +112,7 @@ def submit_grades(
                 EvaluatorGrade(
                     submission_id=sub.id,
                     grading_component_id=g.grading_component_id,
+                    evaluator_id=evaluator_id,
                     score=g.score,
                 )
             )
@@ -236,6 +240,7 @@ def import_grades_csv(
                 .filter(
                     EvaluatorGrade.submission_id == sub.id,
                     EvaluatorGrade.grading_component_id == gc.id,
+                    EvaluatorGrade.evaluator_id == "default",
                 )
                 .first()
             )
@@ -246,6 +251,7 @@ def import_grades_csv(
                     EvaluatorGrade(
                         submission_id=sub.id,
                         grading_component_id=gc.id,
+                        evaluator_id="default",
                         score=score,
                     )
                 )
@@ -338,17 +344,21 @@ def _compute_final_grades(
     subs_by_student: dict[int, Submission] = {s.student_id: s for s in subs}
     sub_ids = [s.id for s in subs]
 
-    eval_grades: dict[int, dict[int, float]] = {}
+    # Collect all evaluator grades, grouped by (submission, component) -> list of scores
+    eval_scores_by_sub_comp: dict[int, dict[int, list[float]]] = {}
     if sub_ids:
         for g in (
             db.query(EvaluatorGrade)
             .filter(EvaluatorGrade.submission_id.in_(sub_ids))
             .all()
         ):
-            eval_grades.setdefault(g.submission_id, {})[g.grading_component_id] = g.score
+            eval_scores_by_sub_comp.setdefault(g.submission_id, {}).setdefault(
+                g.grading_component_id, []
+            ).append(g.score)
 
     student_ids = [s.id for s in students]
-    peer_avg_by_student_component: dict[int, dict[int, float]] = {}
+    peer_scores_by_student_comp: dict[int, dict[int, list[float]]] = {}
+    peer_evaluator_counts: dict[int, int] = {}
     if student_ids:
         pas = (
             db.query(PeerAssignment)
@@ -366,17 +376,15 @@ def _compute_final_grades(
                 .filter(PeerEvaluation.peer_assignment_id.in_(pa_ids))
                 .all()
             )
-            scores_by_student_component: dict[int, dict[int, list[float]]] = {}
+            peer_assignments_with_evals: dict[int, set[int]] = {}
             for pe in evals:
                 evaluee_id = pa_evaluee_map[pe.peer_assignment_id]
-                scores_by_student_component.setdefault(evaluee_id, {}).setdefault(
+                peer_scores_by_student_comp.setdefault(evaluee_id, {}).setdefault(
                     pe.grading_component_id, []
                 ).append(pe.score)
-            for sid, comp_scores in scores_by_student_component.items():
-                peer_avg_by_student_component[sid] = {
-                    gc_id: sum(scores) / len(scores)
-                    for gc_id, scores in comp_scores.items()
-                }
+                peer_assignments_with_evals.setdefault(evaluee_id, set()).add(pe.peer_assignment_id)
+            for sid, pa_set in peer_assignments_with_evals.items():
+                peer_evaluator_counts[sid] = len(pa_set)
 
     penalty_totals: dict[int, float] = {}
     if sub_ids:
@@ -389,6 +397,9 @@ def _compute_final_grades(
                 penalty_totals.get(p.submission_id, 0.0) + p.amount
             )
 
+    num_main_expected = assignment.num_main_evaluators
+    num_peer_expected = assignment.num_peer_evaluators
+
     results = []
     name_warnings: list[str] = []
     for student in students:
@@ -400,20 +411,55 @@ def _compute_final_grades(
         component_scores: dict[str, float] = {}
         final = 0.0
         has_any_grade = False
+        incomplete_pools: list[str] = []
 
         if sub:
-            sub_eval = eval_grades.get(sub.id, {})
-            sub_peer = peer_avg_by_student_component.get(student.id, {})
+            sub_eval_scores = eval_scores_by_sub_comp.get(sub.id, {})
+            sub_peer_scores = peer_scores_by_student_comp.get(student.id, {})
+
+            # Determine how many distinct main evaluators graded this submission
+            main_eval_count = 0
+            if sub_eval_scores:
+                main_eval_count = len(next(iter(sub_eval_scores.values())))
+            peer_eval_count = peer_evaluator_counts.get(student.id, 0)
+
+            # Check for incomplete pools (zero grades when expected)
+            if num_main_expected is not None and num_main_expected > 0 and main_eval_count == 0:
+                incomplete_pools.append("evaluator")
+            if num_peer_expected is not None and num_peer_expected > 0 and peer_eval_count == 0:
+                incomplete_pools.append("peer")
+
+            # Compute effective weights with auto-weighting
+            ew = assignment.evaluator_weight
+            pw = assignment.peer_weight
+
+            if num_main_expected is not None or num_peer_expected is not None:
+                eval_has_grades = main_eval_count > 0
+                peer_has_grades = peer_eval_count > 0
+
+                if not eval_has_grades and not peer_has_grades:
+                    ew, pw = 0.0, 0.0
+                elif not eval_has_grades and peer_has_grades:
+                    # Evaluator pool empty -> all weight to peer
+                    pw = ew + pw
+                    ew = 0.0
+                elif eval_has_grades and not peer_has_grades:
+                    # Peer pool empty -> all weight to evaluator
+                    ew = ew + pw
+                    pw = 0.0
 
             for gc in components:
-                eval_score = sub_eval.get(gc.id)
-                peer_score = sub_peer.get(gc.id)
+                eval_scores_list = sub_eval_scores.get(gc.id, [])
+                peer_scores_list = sub_peer_scores.get(gc.id, [])
+
+                eval_score = sum(eval_scores_list) / len(eval_scores_list) if eval_scores_list else None
+                peer_score = sum(peer_scores_list) / len(peer_scores_list) if peer_scores_list else None
 
                 if eval_score is not None or peer_score is not None:
                     has_any_grade = True
                     consolidated = (
-                        assignment.evaluator_weight * (eval_score or 0.0)
-                        + assignment.peer_weight * (peer_score or 0.0)
+                        ew * (eval_score or 0.0)
+                        + pw * (peer_score or 0.0)
                     )
                     component_scores[gc.name] = round(consolidated, 4)
                     final += gc.weight * consolidated
@@ -428,6 +474,7 @@ def _compute_final_grades(
             "component_scores": component_scores,
             "final_grade": round(final, 4) if has_any_grade else None,
             "name_warning": not name_ok,
+            "incomplete_pools": incomplete_pools,
         })
 
     return results

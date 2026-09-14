@@ -445,6 +445,22 @@ export default function AssignmentDashboardPage() {
                       {row.final_grade != null
                         ? row.final_grade.toFixed(2)
                         : "--"}
+                      {row.incomplete_pools && row.incomplete_pools.length > 0 && (
+                        <span
+                          title={`Missing grades: ${row.incomplete_pools.join(", ")} pool(s) have no submissions`}
+                          style={{
+                            marginLeft: 6,
+                            background: "#f59e0b",
+                            color: "#fff",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            fontSize: 11,
+                            fontWeight: 500,
+                          }}
+                        >
+                          incomplete
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
                       <button

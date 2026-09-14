@@ -67,6 +67,8 @@ class AssignmentCreate(BaseModel):
     checks_directory: str
     evaluator_weight: float
     peer_weight: float
+    num_main_evaluators: int | None = None
+    num_peer_evaluators: int | None = None
     grading_components: list[GradingComponentCreate] = []
     environment_variables: list[EnvVarCreate] = []
 
@@ -81,6 +83,8 @@ class AssignmentOut(BaseModel):
     checks_directory: str
     evaluator_weight: float
     peer_weight: float
+    num_main_evaluators: int | None = None
+    num_peer_evaluators: int | None = None
     grading_components: list[GradingComponentOut] = []
     environment_variables: list[EnvVarOut] = []
 
@@ -146,6 +150,7 @@ class DashboardRow(BaseModel):
     final_grade: float | None = None
     penalty_count: int = 0
     penalty_total: float = 0.0
+    incomplete_pools: list[str] = []
 
     model_config = {"from_attributes": True}
 
@@ -197,6 +202,7 @@ class EvaluatorGradeInput(BaseModel):
 
 
 class EvaluatorGradeSubmit(BaseModel):
+    evaluator_id: str = "default"
     grades: list[EvaluatorGradeInput]
 
 
@@ -205,6 +211,7 @@ class EvaluatorGradeOut(BaseModel):
     submission_id: int
     grading_component_id: int
     component_name: str
+    evaluator_id: str
     score: float
 
     model_config = {"from_attributes": True}
@@ -246,6 +253,12 @@ class BatchSendResult(BaseModel):
     sent: int
     failed: int
     errors: list[str] = []
+
+
+class EmailDraft(BaseModel):
+    to: str
+    subject: str
+    body: str
 
 
 # ── App Settings / Backup ──────────────────────────────────────

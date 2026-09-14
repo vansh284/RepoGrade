@@ -45,6 +45,8 @@ def create_assignment(course_id: int, data: AssignmentCreate, db: Session = Depe
         checks_directory=data.checks_directory,
         evaluator_weight=data.evaluator_weight,
         peer_weight=data.peer_weight,
+        num_main_evaluators=data.num_main_evaluators,
+        num_peer_evaluators=data.num_peer_evaluators,
     )
     for gc in data.grading_components:
         assignment.grading_components.append(
@@ -95,6 +97,8 @@ def update_assignment(course_id: int, assignment_id: int, data: AssignmentUpdate
     assignment.checks_directory = data.checks_directory
     assignment.evaluator_weight = data.evaluator_weight
     assignment.peer_weight = data.peer_weight
+    assignment.num_main_evaluators = data.num_main_evaluators
+    assignment.num_peer_evaluators = data.num_peer_evaluators
     assignment.grading_components.clear()
     for gc in data.grading_components:
         assignment.grading_components.append(

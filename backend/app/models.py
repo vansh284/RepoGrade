@@ -48,6 +48,8 @@ class Assignment(Base):
     checks_directory = Column(String, nullable=False)
     evaluator_weight = Column(Float, nullable=False)
     peer_weight = Column(Float, nullable=False)
+    num_main_evaluators = Column(Integer, nullable=True)
+    num_peer_evaluators = Column(Integer, nullable=True)
 
     course = relationship("Course", back_populates="assignments")
     grading_components = relationship("GradingComponent", back_populates="assignment", cascade="all, delete-orphan")
@@ -128,12 +130,13 @@ class CheckResult(Base):
 class EvaluatorGrade(Base):
     __tablename__ = "evaluator_grades"
     __table_args__ = (
-        UniqueConstraint("submission_id", "grading_component_id", name="uq_submission_component"),
+        UniqueConstraint("submission_id", "grading_component_id", "evaluator_id", name="uq_submission_component_evaluator"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     submission_id = Column(Integer, ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False)
     grading_component_id = Column(Integer, ForeignKey("grading_components.id", ondelete="CASCADE"), nullable=False)
+    evaluator_id = Column(String, nullable=False, default="default")
     score = Column(Float, nullable=False)
 
     submission = relationship("Submission", back_populates="evaluator_grades")
